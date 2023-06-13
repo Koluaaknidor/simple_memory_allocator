@@ -1,0 +1,6 @@
+../Src/allocator.c:17:6:allocator_init	16	static
+../Src/allocator.c:27:13:set_chunk	16	static
+../Src/allocator.c:36:7:allocator_allocate	40	static
+../Src/allocator.c:85:13:free_chunk	16	static
+../Src/allocator.c:92:13:combine_chunks	32	static
+../Src/allocator.c:104:9:allocator_free	24	static

@@ -1,0 +1,6 @@
+allocator.c:17:6:allocator_init	2
+allocator.c:27:13:set_chunk	1
+allocator.c:36:7:allocator_allocate	9
+allocator.c:85:13:free_chunk	1
+allocator.c:92:13:combine_chunks	3
+allocator.c:104:9:allocator_free	5

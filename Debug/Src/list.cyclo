@@ -1,0 +1,6 @@
+list.c:7:9:is_first	2
+list.c:14:9:is_last	2
+list.c:21:17:navigate_next	2
+list.c:28:17:navigate_prev	2
+list.c:36:9:next_free	2
+list.c:44:9:prev_free	2

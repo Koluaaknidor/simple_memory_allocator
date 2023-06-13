@@ -1,0 +1,950 @@
+
+Heap_Malloc.elf:     file format elf32-littlearm
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .isr_vector   00000198  08000000  08000000  00010000  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  1 .text         0000057c  08000198  08000198  00010198  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  2 .rodata       00000000  08000714  0800071c  0001071c  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  3 .ARM.extab    00000000  08000714  08000714  0001071c  2**0
+                  CONTENTS
+  4 .ARM          00000000  08000714  08000714  0001071c  2**0
+                  CONTENTS
+  5 .preinit_array 00000000  08000714  0800071c  0001071c  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  6 .init_array   00000004  08000714  08000714  00010714  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  7 .fini_array   00000004  08000718  08000718  00010718  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  8 .data         00000000  20000000  20000000  0001071c  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .bss          0000001c  20000000  0800071c  00020000  2**2
+                  ALLOC
+ 10 ._user_heap_stack 00000604  2000001c  0800071c  0002001c  2**0
+                  ALLOC
+ 11 .ARM.attributes 00000030  00000000  00000000  0001071c  2**0
+                  CONTENTS, READONLY
+ 12 .debug_info   000006a4  00000000  00000000  0001074c  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 13 .debug_abbrev 000002e7  00000000  00000000  00010df0  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 14 .debug_aranges 000000f0  00000000  00000000  000110d8  2**3
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 15 .debug_ranges 000000b8  00000000  00000000  000111c8  2**3
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 16 .debug_macro  00001f9b  00000000  00000000  00011280  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 17 .debug_line   00001040  00000000  00000000  0001321b  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 18 .debug_str    00007d0f  00000000  00000000  0001425b  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+ 19 .comment      00000050  00000000  00000000  0001bf6a  2**0
+                  CONTENTS, READONLY
+ 20 .debug_frame  000002a4  00000000  00000000  0001bfbc  2**2
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+
+Disassembly of section .text:
+
+08000198 <__do_global_dtors_aux>:
+ 8000198:	b510      	push	{r4, lr}
+ 800019a:	4c05      	ldr	r4, [pc, #20]	; (80001b0 <__do_global_dtors_aux+0x18>)
+ 800019c:	7823      	ldrb	r3, [r4, #0]
+ 800019e:	b933      	cbnz	r3, 80001ae <__do_global_dtors_aux+0x16>
+ 80001a0:	4b04      	ldr	r3, [pc, #16]	; (80001b4 <__do_global_dtors_aux+0x1c>)
+ 80001a2:	b113      	cbz	r3, 80001aa <__do_global_dtors_aux+0x12>
+ 80001a4:	4804      	ldr	r0, [pc, #16]	; (80001b8 <__do_global_dtors_aux+0x20>)
+ 80001a6:	f3af 8000 	nop.w
+ 80001aa:	2301      	movs	r3, #1
+ 80001ac:	7023      	strb	r3, [r4, #0]
+ 80001ae:	bd10      	pop	{r4, pc}
+ 80001b0:	20000000 	.word	0x20000000
+ 80001b4:	00000000 	.word	0x00000000
+ 80001b8:	080006fc 	.word	0x080006fc
+
+080001bc <frame_dummy>:
+ 80001bc:	b508      	push	{r3, lr}
+ 80001be:	4b03      	ldr	r3, [pc, #12]	; (80001cc <frame_dummy+0x10>)
+ 80001c0:	b11b      	cbz	r3, 80001ca <frame_dummy+0xe>
+ 80001c2:	4903      	ldr	r1, [pc, #12]	; (80001d0 <frame_dummy+0x14>)
+ 80001c4:	4803      	ldr	r0, [pc, #12]	; (80001d4 <frame_dummy+0x18>)
+ 80001c6:	f3af 8000 	nop.w
+ 80001ca:	bd08      	pop	{r3, pc}
+ 80001cc:	00000000 	.word	0x00000000
+ 80001d0:	20000004 	.word	0x20000004
+ 80001d4:	080006fc 	.word	0x080006fc
+
+080001d8 <allocator_init>:
+static void free_chunk(LIST_POINTER_t* chunk);
+//Combines anchor with the chunk on the right if its free
+static void combine_chunks(LIST_POINTER_t* anchor);
+
+void allocator_init()
+{
+ 80001d8:	b480      	push	{r7}
+ 80001da:	b083      	sub	sp, #12
+ 80001dc:	af00      	add	r7, sp, #0
+	//TODO: move filling with 0s to startup code
+	uint8_t *byte = (uint8_t*)HEAP_START;
+ 80001de:	4b0c      	ldr	r3, [pc, #48]	; (8000210 <allocator_init+0x38>)
+ 80001e0:	603b      	str	r3, [r7, #0]
+	for (int i=0; i<HEAP_SIZE; i++)
+ 80001e2:	2300      	movs	r3, #0
+ 80001e4:	607b      	str	r3, [r7, #4]
+ 80001e6:	e007      	b.n	80001f8 <allocator_init+0x20>
+	{
+		byte[i] = 0;
+ 80001e8:	687b      	ldr	r3, [r7, #4]
+ 80001ea:	683a      	ldr	r2, [r7, #0]
+ 80001ec:	4413      	add	r3, r2
+ 80001ee:	2200      	movs	r2, #0
+ 80001f0:	701a      	strb	r2, [r3, #0]
+	for (int i=0; i<HEAP_SIZE; i++)
+ 80001f2:	687b      	ldr	r3, [r7, #4]
+ 80001f4:	3301      	adds	r3, #1
+ 80001f6:	607b      	str	r3, [r7, #4]
+ 80001f8:	687b      	ldr	r3, [r7, #4]
+ 80001fa:	f5b3 6f80 	cmp.w	r3, #1024	; 0x400
+ 80001fe:	dbf3      	blt.n	80001e8 <allocator_init+0x10>
+	}
+}
+ 8000200:	bf00      	nop
+ 8000202:	bf00      	nop
+ 8000204:	370c      	adds	r7, #12
+ 8000206:	46bd      	mov	sp, r7
+ 8000208:	f85d 7b04 	ldr.w	r7, [sp], #4
+ 800020c:	4770      	bx	lr
+ 800020e:	bf00      	nop
+ 8000210:	20001000 	.word	0x20001000
+
+08000214 <set_chunk>:
+
+static void set_chunk(LIST_POINTER_t* chunk, LIST_POINTER_t value)
+{
+ 8000214:	b580      	push	{r7, lr}
+ 8000216:	b082      	sub	sp, #8
+ 8000218:	af00      	add	r7, sp, #0
+ 800021a:	6078      	str	r0, [r7, #4]
+ 800021c:	7039      	strb	r1, [r7, #0]
+	chunk->size = value.size;
+ 800021e:	783b      	ldrb	r3, [r7, #0]
+ 8000220:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000224:	b2d9      	uxtb	r1, r3
+ 8000226:	687a      	ldr	r2, [r7, #4]
+ 8000228:	7813      	ldrb	r3, [r2, #0]
+ 800022a:	f361 0306 	bfi	r3, r1, #0, #7
+ 800022e:	7013      	strb	r3, [r2, #0]
+	chunk->free = value.free;
+ 8000230:	783b      	ldrb	r3, [r7, #0]
+ 8000232:	f3c3 13c0 	ubfx	r3, r3, #7, #1
+ 8000236:	b2d9      	uxtb	r1, r3
+ 8000238:	687a      	ldr	r2, [r7, #4]
+ 800023a:	7813      	ldrb	r3, [r2, #0]
+ 800023c:	f361 13c7 	bfi	r3, r1, #7, #1
+ 8000240:	7013      	strb	r3, [r2, #0]
+	chunk = navigate_next(chunk) - 1;
+ 8000242:	6878      	ldr	r0, [r7, #4]
+ 8000244:	f000 f95c 	bl	8000500 <navigate_next>
+ 8000248:	4603      	mov	r3, r0
+ 800024a:	3b01      	subs	r3, #1
+ 800024c:	607b      	str	r3, [r7, #4]
+	chunk->size = value.size;
+ 800024e:	783b      	ldrb	r3, [r7, #0]
+ 8000250:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000254:	b2d9      	uxtb	r1, r3
+ 8000256:	687a      	ldr	r2, [r7, #4]
+ 8000258:	7813      	ldrb	r3, [r2, #0]
+ 800025a:	f361 0306 	bfi	r3, r1, #0, #7
+ 800025e:	7013      	strb	r3, [r2, #0]
+	chunk->free = value.free;
+ 8000260:	783b      	ldrb	r3, [r7, #0]
+ 8000262:	f3c3 13c0 	ubfx	r3, r3, #7, #1
+ 8000266:	b2d9      	uxtb	r1, r3
+ 8000268:	687a      	ldr	r2, [r7, #4]
+ 800026a:	7813      	ldrb	r3, [r2, #0]
+ 800026c:	f361 13c7 	bfi	r3, r1, #7, #1
+ 8000270:	7013      	strb	r3, [r2, #0]
+}
+ 8000272:	bf00      	nop
+ 8000274:	3708      	adds	r7, #8
+ 8000276:	46bd      	mov	sp, r7
+ 8000278:	bd80      	pop	{r7, pc}
+	...
+
+0800027c <allocator_allocate>:
+
+void* allocator_allocate(uint8_t size)
+{
+ 800027c:	b580      	push	{r7, lr}
+ 800027e:	b088      	sub	sp, #32
+ 8000280:	af00      	add	r7, sp, #0
+ 8000282:	4603      	mov	r3, r0
+ 8000284:	71fb      	strb	r3, [r7, #7]
+	LIST_POINTER_t *heap_pointer = (LIST_POINTER_t*)HEAP_START;
+ 8000286:	4b46      	ldr	r3, [pc, #280]	; (80003a0 <allocator_allocate+0x124>)
+ 8000288:	61fb      	str	r3, [r7, #28]
+
+	while (((uint32_t)heap_pointer + CHUNK_SIZE_NO_DATA + size) <= (HEAP_END - CHUNK_SIZE_NO_DATA))
+ 800028a:	e07c      	b.n	8000386 <allocator_allocate+0x10a>
+	{
+		if (heap_pointer->size == 0 || heap_pointer->free == 1)
+ 800028c:	69fb      	ldr	r3, [r7, #28]
+ 800028e:	781b      	ldrb	r3, [r3, #0]
+ 8000290:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000294:	b2db      	uxtb	r3, r3
+ 8000296:	2b00      	cmp	r3, #0
+ 8000298:	d006      	beq.n	80002a8 <allocator_allocate+0x2c>
+ 800029a:	69fb      	ldr	r3, [r7, #28]
+ 800029c:	781b      	ldrb	r3, [r3, #0]
+ 800029e:	f023 037f 	bic.w	r3, r3, #127	; 0x7f
+ 80002a2:	b2db      	uxtb	r3, r3
+ 80002a4:	2b00      	cmp	r3, #0
+ 80002a6:	d06a      	beq.n	800037e <allocator_allocate+0x102>
+		{
+			if (heap_pointer->size >= size)
+ 80002a8:	69fb      	ldr	r3, [r7, #28]
+ 80002aa:	781b      	ldrb	r3, [r3, #0]
+ 80002ac:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 80002b0:	b2db      	uxtb	r3, r3
+ 80002b2:	461a      	mov	r2, r3
+ 80002b4:	79fb      	ldrb	r3, [r7, #7]
+ 80002b6:	429a      	cmp	r2, r3
+ 80002b8:	db48      	blt.n	800034c <allocator_allocate+0xd0>
+			{
+				uint8_t bytes_left = heap_pointer->size - size;
+ 80002ba:	69fb      	ldr	r3, [r7, #28]
+ 80002bc:	781b      	ldrb	r3, [r3, #0]
+ 80002be:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 80002c2:	b2db      	uxtb	r3, r3
+ 80002c4:	461a      	mov	r2, r3
+ 80002c6:	79fb      	ldrb	r3, [r7, #7]
+ 80002c8:	1ad3      	subs	r3, r2, r3
+ 80002ca:	76fb      	strb	r3, [r7, #27]
+				LIST_POINTER_t chunk_new_value;
+				chunk_new_value.free = 0;
+ 80002cc:	7c3b      	ldrb	r3, [r7, #16]
+ 80002ce:	f36f 13c7 	bfc	r3, #7, #1
+ 80002d2:	743b      	strb	r3, [r7, #16]
+				chunk_new_value.size = size;
+ 80002d4:	79fb      	ldrb	r3, [r7, #7]
+ 80002d6:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 80002da:	b2da      	uxtb	r2, r3
+ 80002dc:	7c3b      	ldrb	r3, [r7, #16]
+ 80002de:	f362 0306 	bfi	r3, r2, #0, #7
+ 80002e2:	743b      	strb	r3, [r7, #16]
+
+				//Occupy rest of the bytes to not leave a chunk that is unable to hold data
+				if (bytes_left > 0 && bytes_left <= CHUNK_SIZE_NO_DATA)
+ 80002e4:	7efb      	ldrb	r3, [r7, #27]
+ 80002e6:	2b00      	cmp	r3, #0
+ 80002e8:	d011      	beq.n	800030e <allocator_allocate+0x92>
+ 80002ea:	7efb      	ldrb	r3, [r7, #27]
+ 80002ec:	2b02      	cmp	r3, #2
+ 80002ee:	d80e      	bhi.n	800030e <allocator_allocate+0x92>
+					chunk_new_value.size += bytes_left;
+ 80002f0:	7c3b      	ldrb	r3, [r7, #16]
+ 80002f2:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 80002f6:	b2db      	uxtb	r3, r3
+ 80002f8:	461a      	mov	r2, r3
+ 80002fa:	7efb      	ldrb	r3, [r7, #27]
+ 80002fc:	4413      	add	r3, r2
+ 80002fe:	b2db      	uxtb	r3, r3
+ 8000300:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000304:	b2da      	uxtb	r2, r3
+ 8000306:	7c3b      	ldrb	r3, [r7, #16]
+ 8000308:	f362 0306 	bfi	r3, r2, #0, #7
+ 800030c:	743b      	strb	r3, [r7, #16]
+
+				set_chunk(heap_pointer, chunk_new_value);
+ 800030e:	7c39      	ldrb	r1, [r7, #16]
+ 8000310:	69f8      	ldr	r0, [r7, #28]
+ 8000312:	f7ff ff7f 	bl	8000214 <set_chunk>
+
+				if (bytes_left > CHUNK_SIZE_NO_DATA)
+ 8000316:	7efb      	ldrb	r3, [r7, #27]
+ 8000318:	2b02      	cmp	r3, #2
+ 800031a:	d915      	bls.n	8000348 <allocator_allocate+0xcc>
+				{
+					LIST_POINTER_t *next_chunk_pointer = navigate_next(heap_pointer);
+ 800031c:	69f8      	ldr	r0, [r7, #28]
+ 800031e:	f000 f8ef 	bl	8000500 <navigate_next>
+ 8000322:	6178      	str	r0, [r7, #20]
+					chunk_new_value.free = 1;
+ 8000324:	7c3b      	ldrb	r3, [r7, #16]
+ 8000326:	f043 0380 	orr.w	r3, r3, #128	; 0x80
+ 800032a:	743b      	strb	r3, [r7, #16]
+					chunk_new_value.size = bytes_left - CHUNK_SIZE_NO_DATA;
+ 800032c:	7efb      	ldrb	r3, [r7, #27]
+ 800032e:	3b02      	subs	r3, #2
+ 8000330:	b2db      	uxtb	r3, r3
+ 8000332:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000336:	b2da      	uxtb	r2, r3
+ 8000338:	7c3b      	ldrb	r3, [r7, #16]
+ 800033a:	f362 0306 	bfi	r3, r2, #0, #7
+ 800033e:	743b      	strb	r3, [r7, #16]
+					set_chunk(next_chunk_pointer, chunk_new_value);
+ 8000340:	7c39      	ldrb	r1, [r7, #16]
+ 8000342:	6978      	ldr	r0, [r7, #20]
+ 8000344:	f7ff ff66 	bl	8000214 <set_chunk>
+				}
+
+				return heap_pointer;
+ 8000348:	69fb      	ldr	r3, [r7, #28]
+ 800034a:	e025      	b.n	8000398 <allocator_allocate+0x11c>
+			}
+			else if (heap_pointer->size == 0)
+ 800034c:	69fb      	ldr	r3, [r7, #28]
+ 800034e:	781b      	ldrb	r3, [r3, #0]
+ 8000350:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000354:	b2db      	uxtb	r3, r3
+ 8000356:	2b00      	cmp	r3, #0
+ 8000358:	d111      	bne.n	800037e <allocator_allocate+0x102>
+			{
+				LIST_POINTER_t chunk_new_value;
+				chunk_new_value.free = 0;
+ 800035a:	7b3b      	ldrb	r3, [r7, #12]
+ 800035c:	f36f 13c7 	bfc	r3, #7, #1
+ 8000360:	733b      	strb	r3, [r7, #12]
+				chunk_new_value.size = size;
+ 8000362:	79fb      	ldrb	r3, [r7, #7]
+ 8000364:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000368:	b2da      	uxtb	r2, r3
+ 800036a:	7b3b      	ldrb	r3, [r7, #12]
+ 800036c:	f362 0306 	bfi	r3, r2, #0, #7
+ 8000370:	733b      	strb	r3, [r7, #12]
+				set_chunk(heap_pointer, chunk_new_value);
+ 8000372:	7b39      	ldrb	r1, [r7, #12]
+ 8000374:	69f8      	ldr	r0, [r7, #28]
+ 8000376:	f7ff ff4d 	bl	8000214 <set_chunk>
+
+				return heap_pointer;
+ 800037a:	69fb      	ldr	r3, [r7, #28]
+ 800037c:	e00c      	b.n	8000398 <allocator_allocate+0x11c>
+			}
+			else
+				;
+		}
+		heap_pointer = navigate_next(heap_pointer);
+ 800037e:	69f8      	ldr	r0, [r7, #28]
+ 8000380:	f000 f8be 	bl	8000500 <navigate_next>
+ 8000384:	61f8      	str	r0, [r7, #28]
+	while (((uint32_t)heap_pointer + CHUNK_SIZE_NO_DATA + size) <= (HEAP_END - CHUNK_SIZE_NO_DATA))
+ 8000386:	79fa      	ldrb	r2, [r7, #7]
+ 8000388:	69fb      	ldr	r3, [r7, #28]
+ 800038a:	4413      	add	r3, r2
+ 800038c:	3302      	adds	r3, #2
+ 800038e:	4a05      	ldr	r2, [pc, #20]	; (80003a4 <allocator_allocate+0x128>)
+ 8000390:	4293      	cmp	r3, r2
+ 8000392:	f67f af7b 	bls.w	800028c <allocator_allocate+0x10>
+	}
+	//No right spot found
+	return NULL;
+ 8000396:	2300      	movs	r3, #0
+}
+ 8000398:	4618      	mov	r0, r3
+ 800039a:	3720      	adds	r7, #32
+ 800039c:	46bd      	mov	sp, r7
+ 800039e:	bd80      	pop	{r7, pc}
+ 80003a0:	20001000 	.word	0x20001000
+ 80003a4:	200013fe 	.word	0x200013fe
+
+080003a8 <free_chunk>:
+
+static void free_chunk(LIST_POINTER_t* chunk)
+{
+ 80003a8:	b580      	push	{r7, lr}
+ 80003aa:	b082      	sub	sp, #8
+ 80003ac:	af00      	add	r7, sp, #0
+ 80003ae:	6078      	str	r0, [r7, #4]
+	chunk->free = 1;
+ 80003b0:	687a      	ldr	r2, [r7, #4]
+ 80003b2:	7813      	ldrb	r3, [r2, #0]
+ 80003b4:	f043 0380 	orr.w	r3, r3, #128	; 0x80
+ 80003b8:	7013      	strb	r3, [r2, #0]
+	chunk = navigate_next(chunk) - 1;
+ 80003ba:	6878      	ldr	r0, [r7, #4]
+ 80003bc:	f000 f8a0 	bl	8000500 <navigate_next>
+ 80003c0:	4603      	mov	r3, r0
+ 80003c2:	3b01      	subs	r3, #1
+ 80003c4:	607b      	str	r3, [r7, #4]
+	chunk->free = 1;
+ 80003c6:	687a      	ldr	r2, [r7, #4]
+ 80003c8:	7813      	ldrb	r3, [r2, #0]
+ 80003ca:	f043 0380 	orr.w	r3, r3, #128	; 0x80
+ 80003ce:	7013      	strb	r3, [r2, #0]
+}
+ 80003d0:	bf00      	nop
+ 80003d2:	3708      	adds	r7, #8
+ 80003d4:	46bd      	mov	sp, r7
+ 80003d6:	bd80      	pop	{r7, pc}
+
+080003d8 <combine_chunks>:
+
+static void combine_chunks(LIST_POINTER_t* anchor)
+{
+ 80003d8:	b590      	push	{r4, r7, lr}
+ 80003da:	b085      	sub	sp, #20
+ 80003dc:	af00      	add	r7, sp, #0
+ 80003de:	6078      	str	r0, [r7, #4]
+	if (next_free(anchor) && anchor->free)
+ 80003e0:	6878      	ldr	r0, [r7, #4]
+ 80003e2:	f000 f8c0 	bl	8000566 <next_free>
+ 80003e6:	4603      	mov	r3, r0
+ 80003e8:	2b00      	cmp	r3, #0
+ 80003ea:	d027      	beq.n	800043c <combine_chunks+0x64>
+ 80003ec:	687b      	ldr	r3, [r7, #4]
+ 80003ee:	781b      	ldrb	r3, [r3, #0]
+ 80003f0:	f023 037f 	bic.w	r3, r3, #127	; 0x7f
+ 80003f4:	b2db      	uxtb	r3, r3
+ 80003f6:	2b00      	cmp	r3, #0
+ 80003f8:	d020      	beq.n	800043c <combine_chunks+0x64>
+	{
+		LIST_POINTER_t new_chunk_value;
+		new_chunk_value.size = anchor->size + navigate_next(anchor)->size + CHUNK_SIZE_NO_DATA;
+ 80003fa:	687b      	ldr	r3, [r7, #4]
+ 80003fc:	781b      	ldrb	r3, [r3, #0]
+ 80003fe:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000402:	b2db      	uxtb	r3, r3
+ 8000404:	461c      	mov	r4, r3
+ 8000406:	6878      	ldr	r0, [r7, #4]
+ 8000408:	f000 f87a 	bl	8000500 <navigate_next>
+ 800040c:	4603      	mov	r3, r0
+ 800040e:	781b      	ldrb	r3, [r3, #0]
+ 8000410:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000414:	b2db      	uxtb	r3, r3
+ 8000416:	4423      	add	r3, r4
+ 8000418:	b2db      	uxtb	r3, r3
+ 800041a:	3302      	adds	r3, #2
+ 800041c:	b2db      	uxtb	r3, r3
+ 800041e:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 8000422:	b2da      	uxtb	r2, r3
+ 8000424:	7b3b      	ldrb	r3, [r7, #12]
+ 8000426:	f362 0306 	bfi	r3, r2, #0, #7
+ 800042a:	733b      	strb	r3, [r7, #12]
+		new_chunk_value.free = 1;
+ 800042c:	7b3b      	ldrb	r3, [r7, #12]
+ 800042e:	f043 0380 	orr.w	r3, r3, #128	; 0x80
+ 8000432:	733b      	strb	r3, [r7, #12]
+
+		set_chunk(anchor, new_chunk_value);
+ 8000434:	7b39      	ldrb	r1, [r7, #12]
+ 8000436:	6878      	ldr	r0, [r7, #4]
+ 8000438:	f7ff feec 	bl	8000214 <set_chunk>
+	}
+}
+ 800043c:	bf00      	nop
+ 800043e:	3714      	adds	r7, #20
+ 8000440:	46bd      	mov	sp, r7
+ 8000442:	bd90      	pop	{r4, r7, pc}
+
+08000444 <allocator_free>:
+
+uint8_t allocator_free(void *chunk_pointer)
+{
+ 8000444:	b580      	push	{r7, lr}
+ 8000446:	b084      	sub	sp, #16
+ 8000448:	af00      	add	r7, sp, #0
+ 800044a:	6078      	str	r0, [r7, #4]
+	chunk_pointer = (LIST_POINTER_t*)chunk_pointer;
+	LIST_POINTER_t *heap_pointer = (LIST_POINTER_t*)HEAP_START;
+ 800044c:	4b17      	ldr	r3, [pc, #92]	; (80004ac <allocator_free+0x68>)
+ 800044e:	60fb      	str	r3, [r7, #12]
+	while ((uint32_t)chunk_pointer >= (uint32_t)heap_pointer)
+ 8000450:	e022      	b.n	8000498 <allocator_free+0x54>
+	{
+		if ((uint32_t)chunk_pointer == (uint32_t)heap_pointer)
+ 8000452:	687a      	ldr	r2, [r7, #4]
+ 8000454:	68fb      	ldr	r3, [r7, #12]
+ 8000456:	429a      	cmp	r2, r3
+ 8000458:	d11a      	bne.n	8000490 <allocator_free+0x4c>
+		{
+			free_chunk(chunk_pointer);
+ 800045a:	6878      	ldr	r0, [r7, #4]
+ 800045c:	f7ff ffa4 	bl	80003a8 <free_chunk>
+			if (!is_last(chunk_pointer))
+ 8000460:	6878      	ldr	r0, [r7, #4]
+ 8000462:	f000 f839 	bl	80004d8 <is_last>
+ 8000466:	4603      	mov	r3, r0
+ 8000468:	2b00      	cmp	r3, #0
+ 800046a:	d102      	bne.n	8000472 <allocator_free+0x2e>
+				combine_chunks(chunk_pointer);
+ 800046c:	6878      	ldr	r0, [r7, #4]
+ 800046e:	f7ff ffb3 	bl	80003d8 <combine_chunks>
+			if (!is_first(chunk_pointer))
+ 8000472:	6878      	ldr	r0, [r7, #4]
+ 8000474:	f000 f81c 	bl	80004b0 <is_first>
+ 8000478:	4603      	mov	r3, r0
+ 800047a:	2b00      	cmp	r3, #0
+ 800047c:	d106      	bne.n	800048c <allocator_free+0x48>
+			{
+				combine_chunks(navigate_prev(chunk_pointer));
+ 800047e:	6878      	ldr	r0, [r7, #4]
+ 8000480:	f000 f856 	bl	8000530 <navigate_prev>
+ 8000484:	4603      	mov	r3, r0
+ 8000486:	4618      	mov	r0, r3
+ 8000488:	f7ff ffa6 	bl	80003d8 <combine_chunks>
+			}
+			return 1;
+ 800048c:	2301      	movs	r3, #1
+ 800048e:	e008      	b.n	80004a2 <allocator_free+0x5e>
+		}
+		heap_pointer = navigate_next(heap_pointer);
+ 8000490:	68f8      	ldr	r0, [r7, #12]
+ 8000492:	f000 f835 	bl	8000500 <navigate_next>
+ 8000496:	60f8      	str	r0, [r7, #12]
+	while ((uint32_t)chunk_pointer >= (uint32_t)heap_pointer)
+ 8000498:	687a      	ldr	r2, [r7, #4]
+ 800049a:	68fb      	ldr	r3, [r7, #12]
+ 800049c:	429a      	cmp	r2, r3
+ 800049e:	d2d8      	bcs.n	8000452 <allocator_free+0xe>
+	}
+	//No right spot found
+	return 0;
+ 80004a0:	2300      	movs	r3, #0
+}
+ 80004a2:	4618      	mov	r0, r3
+ 80004a4:	3710      	adds	r7, #16
+ 80004a6:	46bd      	mov	sp, r7
+ 80004a8:	bd80      	pop	{r7, pc}
+ 80004aa:	bf00      	nop
+ 80004ac:	20001000 	.word	0x20001000
+
+080004b0 <is_first>:
+#include <stddef.h>
+#include "main.h"
+#include "allocator.h"
+
+uint8_t is_first(LIST_POINTER_t* current_pointer)
+{
+ 80004b0:	b480      	push	{r7}
+ 80004b2:	b083      	sub	sp, #12
+ 80004b4:	af00      	add	r7, sp, #0
+ 80004b6:	6078      	str	r0, [r7, #4]
+	if ((uint32_t)current_pointer == HEAP_START)
+ 80004b8:	687b      	ldr	r3, [r7, #4]
+ 80004ba:	4a06      	ldr	r2, [pc, #24]	; (80004d4 <is_first+0x24>)
+ 80004bc:	4293      	cmp	r3, r2
+ 80004be:	d101      	bne.n	80004c4 <is_first+0x14>
+		return 1;
+ 80004c0:	2301      	movs	r3, #1
+ 80004c2:	e000      	b.n	80004c6 <is_first+0x16>
+	return 0;
+ 80004c4:	2300      	movs	r3, #0
+}
+ 80004c6:	4618      	mov	r0, r3
+ 80004c8:	370c      	adds	r7, #12
+ 80004ca:	46bd      	mov	sp, r7
+ 80004cc:	f85d 7b04 	ldr.w	r7, [sp], #4
+ 80004d0:	4770      	bx	lr
+ 80004d2:	bf00      	nop
+ 80004d4:	20001000 	.word	0x20001000
+
+080004d8 <is_last>:
+
+uint8_t is_last(LIST_POINTER_t* current_pointer)
+{
+ 80004d8:	b480      	push	{r7}
+ 80004da:	b083      	sub	sp, #12
+ 80004dc:	af00      	add	r7, sp, #0
+ 80004de:	6078      	str	r0, [r7, #4]
+	if (current_pointer->size == STOP_SIZE)
+ 80004e0:	687b      	ldr	r3, [r7, #4]
+ 80004e2:	781b      	ldrb	r3, [r3, #0]
+ 80004e4:	f003 037f 	and.w	r3, r3, #127	; 0x7f
+ 80004e8:	b2db      	uxtb	r3, r3
+ 80004ea:	2b00      	cmp	r3, #0
+ 80004ec:	d101      	bne.n	80004f2 <is_last+0x1a>
+		return 1;
+ 80004ee:	2301      	movs	r3, #1
+ 80004f0:	e000      	b.n	80004f4 <is_last+0x1c>
+	return 0;
+ 80004f2:	2300      	movs	r3, #0
+}
+ 80004f4:	4618      	mov	r0, r3
+ 80004f6:	370c      	adds	r7, #12
+ 80004f8:	46bd      	mov	sp, r7
+ 80004fa:	f85d 7b04 	ldr.w	r7, [sp], #4
+ 80004fe:	4770      	bx	lr
+
+08000500 <navigate_next>:
+
+LIST_POINTER_t* navigate_next(LIST_POINTER_t* current_pointer)
+{
+ 8000500:	b580      	push	{r7, lr}
+ 8000502:	b082      	sub	sp, #8
+ 8000504:	af00      	add	r7, sp, #0
+ 8000506:	6078      	str	r0, [r7, #4]
+	if (is_last(current_pointer))
+ 8000508:	6878      	ldr	r0, [r7, #4]
+ 800050a:	f7ff ffe5 	bl	80004d8 <is_last>
+ 800050e:	4603      	mov	r3, r0
+ 8000510:	2b00      	cmp	r3, #0
+ 8000512:	d001      	beq.n	8000518 <navigate_next+0x18>
+		return NULL;
+ 8000514:	2300      	movs	r3, #0
+ 8000516:	e007      	b.n	8000528 <navigate_next+0x28>
+	return current_pointer + (current_pointer->size + CHUNK_SIZE_NO_DATA);
+ 8000518:	687b      	ldr	r3, [r7, #4]
+ 800051a:	781b      	ldrb	r3, [r3, #0]
+ 800051c:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000520:	b2db      	uxtb	r3, r3
+ 8000522:	3302      	adds	r3, #2
+ 8000524:	687a      	ldr	r2, [r7, #4]
+ 8000526:	4413      	add	r3, r2
+}
+ 8000528:	4618      	mov	r0, r3
+ 800052a:	3708      	adds	r7, #8
+ 800052c:	46bd      	mov	sp, r7
+ 800052e:	bd80      	pop	{r7, pc}
+
+08000530 <navigate_prev>:
+
+LIST_POINTER_t* navigate_prev(LIST_POINTER_t* current_pointer)
+{
+ 8000530:	b580      	push	{r7, lr}
+ 8000532:	b082      	sub	sp, #8
+ 8000534:	af00      	add	r7, sp, #0
+ 8000536:	6078      	str	r0, [r7, #4]
+	if (is_first(current_pointer))
+ 8000538:	6878      	ldr	r0, [r7, #4]
+ 800053a:	f7ff ffb9 	bl	80004b0 <is_first>
+ 800053e:	4603      	mov	r3, r0
+ 8000540:	2b00      	cmp	r3, #0
+ 8000542:	d001      	beq.n	8000548 <navigate_prev+0x18>
+		return NULL;
+ 8000544:	2300      	movs	r3, #0
+ 8000546:	e00a      	b.n	800055e <navigate_prev+0x2e>
+	current_pointer -= 1;
+ 8000548:	687b      	ldr	r3, [r7, #4]
+ 800054a:	3b01      	subs	r3, #1
+ 800054c:	607b      	str	r3, [r7, #4]
+	return current_pointer - (current_pointer->size + CHUNK_SIZE_NO_DATA - 1);
+ 800054e:	687b      	ldr	r3, [r7, #4]
+ 8000550:	781b      	ldrb	r3, [r3, #0]
+ 8000552:	f3c3 0306 	ubfx	r3, r3, #0, #7
+ 8000556:	b2db      	uxtb	r3, r3
+ 8000558:	43db      	mvns	r3, r3
+ 800055a:	687a      	ldr	r2, [r7, #4]
+ 800055c:	4413      	add	r3, r2
+}
+ 800055e:	4618      	mov	r0, r3
+ 8000560:	3708      	adds	r7, #8
+ 8000562:	46bd      	mov	sp, r7
+ 8000564:	bd80      	pop	{r7, pc}
+
+08000566 <next_free>:
+
+uint8_t next_free(LIST_POINTER_t* current_pointer)
+{
+ 8000566:	b580      	push	{r7, lr}
+ 8000568:	b082      	sub	sp, #8
+ 800056a:	af00      	add	r7, sp, #0
+ 800056c:	6078      	str	r0, [r7, #4]
+	current_pointer = navigate_next(current_pointer);
+ 800056e:	6878      	ldr	r0, [r7, #4]
+ 8000570:	f7ff ffc6 	bl	8000500 <navigate_next>
+ 8000574:	6078      	str	r0, [r7, #4]
+	if (current_pointer == NULL)
+ 8000576:	687b      	ldr	r3, [r7, #4]
+ 8000578:	2b00      	cmp	r3, #0
+ 800057a:	d101      	bne.n	8000580 <next_free+0x1a>
+		return 0;
+ 800057c:	2300      	movs	r3, #0
+ 800057e:	e004      	b.n	800058a <next_free+0x24>
+	return current_pointer->free;
+ 8000580:	687b      	ldr	r3, [r7, #4]
+ 8000582:	781b      	ldrb	r3, [r3, #0]
+ 8000584:	f3c3 13c0 	ubfx	r3, r3, #7, #1
+ 8000588:	b2db      	uxtb	r3, r3
+}
+ 800058a:	4618      	mov	r0, r3
+ 800058c:	3708      	adds	r7, #8
+ 800058e:	46bd      	mov	sp, r7
+ 8000590:	bd80      	pop	{r7, pc}
+
+08000592 <case_1>:
+#include <stdio.h>
+#include "main.h"
+#include "allocator.h"
+
+void case_1()
+{
+ 8000592:	b580      	push	{r7, lr}
+ 8000594:	b084      	sub	sp, #16
+ 8000596:	af00      	add	r7, sp, #0
+	allocator_init();
+ 8000598:	f7ff fe1e 	bl	80001d8 <allocator_init>
+	void *a1 = allocator_allocate(2);
+ 800059c:	2002      	movs	r0, #2
+ 800059e:	f7ff fe6d 	bl	800027c <allocator_allocate>
+ 80005a2:	60f8      	str	r0, [r7, #12]
+	void *a2 = allocator_allocate(3);
+ 80005a4:	2003      	movs	r0, #3
+ 80005a6:	f7ff fe69 	bl	800027c <allocator_allocate>
+ 80005aa:	60b8      	str	r0, [r7, #8]
+	void *a3 = allocator_allocate(4);
+ 80005ac:	2004      	movs	r0, #4
+ 80005ae:	f7ff fe65 	bl	800027c <allocator_allocate>
+ 80005b2:	6078      	str	r0, [r7, #4]
+	allocator_free(a2);
+ 80005b4:	68b8      	ldr	r0, [r7, #8]
+ 80005b6:	f7ff ff45 	bl	8000444 <allocator_free>
+	allocator_free(a1);
+ 80005ba:	68f8      	ldr	r0, [r7, #12]
+ 80005bc:	f7ff ff42 	bl	8000444 <allocator_free>
+	allocator_allocate(1);
+ 80005c0:	2001      	movs	r0, #1
+ 80005c2:	f7ff fe5b 	bl	800027c <allocator_allocate>
+}
+ 80005c6:	bf00      	nop
+ 80005c8:	3710      	adds	r7, #16
+ 80005ca:	46bd      	mov	sp, r7
+ 80005cc:	bd80      	pop	{r7, pc}
+
+080005ce <case_2>:
+
+void case_2()
+{
+ 80005ce:	b580      	push	{r7, lr}
+ 80005d0:	b084      	sub	sp, #16
+ 80005d2:	af00      	add	r7, sp, #0
+	allocator_init();
+ 80005d4:	f7ff fe00 	bl	80001d8 <allocator_init>
+	void *a1 = allocator_allocate(2);
+ 80005d8:	2002      	movs	r0, #2
+ 80005da:	f7ff fe4f 	bl	800027c <allocator_allocate>
+ 80005de:	60f8      	str	r0, [r7, #12]
+	void *a2 = allocator_allocate(3);
+ 80005e0:	2003      	movs	r0, #3
+ 80005e2:	f7ff fe4b 	bl	800027c <allocator_allocate>
+ 80005e6:	60b8      	str	r0, [r7, #8]
+	void *a3 = allocator_allocate(4);
+ 80005e8:	2004      	movs	r0, #4
+ 80005ea:	f7ff fe47 	bl	800027c <allocator_allocate>
+ 80005ee:	6078      	str	r0, [r7, #4]
+	allocator_free(a2);
+ 80005f0:	68b8      	ldr	r0, [r7, #8]
+ 80005f2:	f7ff ff27 	bl	8000444 <allocator_free>
+	allocator_free(a3);
+ 80005f6:	6878      	ldr	r0, [r7, #4]
+ 80005f8:	f7ff ff24 	bl	8000444 <allocator_free>
+	allocator_allocate(1);
+ 80005fc:	2001      	movs	r0, #1
+ 80005fe:	f7ff fe3d 	bl	800027c <allocator_allocate>
+}
+ 8000602:	bf00      	nop
+ 8000604:	3710      	adds	r7, #16
+ 8000606:	46bd      	mov	sp, r7
+ 8000608:	bd80      	pop	{r7, pc}
+
+0800060a <case_3>:
+
+void case_3()
+{
+ 800060a:	b580      	push	{r7, lr}
+ 800060c:	b084      	sub	sp, #16
+ 800060e:	af00      	add	r7, sp, #0
+	allocator_init();
+ 8000610:	f7ff fde2 	bl	80001d8 <allocator_init>
+	void *a1 = allocator_allocate(2);
+ 8000614:	2002      	movs	r0, #2
+ 8000616:	f7ff fe31 	bl	800027c <allocator_allocate>
+ 800061a:	60f8      	str	r0, [r7, #12]
+	void *a2 = allocator_allocate(3);
+ 800061c:	2003      	movs	r0, #3
+ 800061e:	f7ff fe2d 	bl	800027c <allocator_allocate>
+ 8000622:	60b8      	str	r0, [r7, #8]
+	void *a3 = allocator_allocate(4);
+ 8000624:	2004      	movs	r0, #4
+ 8000626:	f7ff fe29 	bl	800027c <allocator_allocate>
+ 800062a:	6078      	str	r0, [r7, #4]
+	allocator_free(a1);
+ 800062c:	68f8      	ldr	r0, [r7, #12]
+ 800062e:	f7ff ff09 	bl	8000444 <allocator_free>
+	allocator_free(a3);
+ 8000632:	6878      	ldr	r0, [r7, #4]
+ 8000634:	f7ff ff06 	bl	8000444 <allocator_free>
+	allocator_free(a2);
+ 8000638:	68b8      	ldr	r0, [r7, #8]
+ 800063a:	f7ff ff03 	bl	8000444 <allocator_free>
+	allocator_allocate(1);
+ 800063e:	2001      	movs	r0, #1
+ 8000640:	f7ff fe1c 	bl	800027c <allocator_allocate>
+}
+ 8000644:	bf00      	nop
+ 8000646:	3710      	adds	r7, #16
+ 8000648:	46bd      	mov	sp, r7
+ 800064a:	bd80      	pop	{r7, pc}
+
+0800064c <main>:
+
+int main(void)
+{
+ 800064c:	b580      	push	{r7, lr}
+ 800064e:	af00      	add	r7, sp, #0
+	case_1();
+ 8000650:	f7ff ff9f 	bl	8000592 <case_1>
+	case_2();
+ 8000654:	f7ff ffbb 	bl	80005ce <case_2>
+	case_3();
+ 8000658:	f7ff ffd7 	bl	800060a <case_3>
+    /* Loop forever */
+	for(;;);
+ 800065c:	e7fe      	b.n	800065c <main+0x10>
+	...
+
+08000660 <Reset_Handler>:
+
+  .section .text.Reset_Handler
+  .weak Reset_Handler
+  .type Reset_Handler, %function
+Reset_Handler:
+  ldr   r0, =_estack
+ 8000660:	480d      	ldr	r0, [pc, #52]	; (8000698 <LoopForever+0x2>)
+  mov   sp, r0          /* set stack pointer */
+ 8000662:	4685      	mov	sp, r0
+/* Call the clock system initialization function.*/
+  bl  SystemInit
+ 8000664:	f3af 8000 	nop.w
+
+/* Copy the data segment initializers from flash to SRAM */
+  ldr r0, =_sdata
+ 8000668:	480c      	ldr	r0, [pc, #48]	; (800069c <LoopForever+0x6>)
+  ldr r1, =_edata
+ 800066a:	490d      	ldr	r1, [pc, #52]	; (80006a0 <LoopForever+0xa>)
+  ldr r2, =_sidata
+ 800066c:	4a0d      	ldr	r2, [pc, #52]	; (80006a4 <LoopForever+0xe>)
+  movs r3, #0
+ 800066e:	2300      	movs	r3, #0
+  b LoopCopyDataInit
+ 8000670:	e002      	b.n	8000678 <LoopCopyDataInit>
+
+08000672 <CopyDataInit>:
+
+CopyDataInit:
+  ldr r4, [r2, r3]
+ 8000672:	58d4      	ldr	r4, [r2, r3]
+  str r4, [r0, r3]
+ 8000674:	50c4      	str	r4, [r0, r3]
+  adds r3, r3, #4
+ 8000676:	3304      	adds	r3, #4
+
+08000678 <LoopCopyDataInit>:
+
+LoopCopyDataInit:
+  adds r4, r0, r3
+ 8000678:	18c4      	adds	r4, r0, r3
+  cmp r4, r1
+ 800067a:	428c      	cmp	r4, r1
+  bcc CopyDataInit
+ 800067c:	d3f9      	bcc.n	8000672 <CopyDataInit>
+
+/* Zero fill the bss segment. */
+  ldr r2, =_sbss
+ 800067e:	4a0a      	ldr	r2, [pc, #40]	; (80006a8 <LoopForever+0x12>)
+  ldr r4, =_ebss
+ 8000680:	4c0a      	ldr	r4, [pc, #40]	; (80006ac <LoopForever+0x16>)
+  movs r3, #0
+ 8000682:	2300      	movs	r3, #0
+  b LoopFillZerobss
+ 8000684:	e001      	b.n	800068a <LoopFillZerobss>
+
+08000686 <FillZerobss>:
+
+FillZerobss:
+  str  r3, [r2]
+ 8000686:	6013      	str	r3, [r2, #0]
+  adds r2, r2, #4
+ 8000688:	3204      	adds	r2, #4
+
+0800068a <LoopFillZerobss>:
+
+LoopFillZerobss:
+  cmp r2, r4
+ 800068a:	42a2      	cmp	r2, r4
+  bcc FillZerobss
+ 800068c:	d3fb      	bcc.n	8000686 <FillZerobss>
+
+/* Call static constructors */
+  bl __libc_init_array
+ 800068e:	f000 f811 	bl	80006b4 <__libc_init_array>
+/* Call the application's entry point.*/
+  bl main
+ 8000692:	f7ff ffdb 	bl	800064c <main>
+
+08000696 <LoopForever>:
+
+LoopForever:
+  b LoopForever
+ 8000696:	e7fe      	b.n	8000696 <LoopForever>
+  ldr   r0, =_estack
+ 8000698:	20020000 	.word	0x20020000
+  ldr r0, =_sdata
+ 800069c:	20000000 	.word	0x20000000
+  ldr r1, =_edata
+ 80006a0:	20000000 	.word	0x20000000
+  ldr r2, =_sidata
+ 80006a4:	0800071c 	.word	0x0800071c
+  ldr r2, =_sbss
+ 80006a8:	20000000 	.word	0x20000000
+  ldr r4, =_ebss
+ 80006ac:	2000001c 	.word	0x2000001c
+
+080006b0 <ADC_IRQHandler>:
+ * @retval : None
+*/
+  .section .text.Default_Handler,"ax",%progbits
+Default_Handler:
+Infinite_Loop:
+  b Infinite_Loop
+ 80006b0:	e7fe      	b.n	80006b0 <ADC_IRQHandler>
+	...
+
+080006b4 <__libc_init_array>:
+ 80006b4:	b570      	push	{r4, r5, r6, lr}
+ 80006b6:	4d0d      	ldr	r5, [pc, #52]	; (80006ec <__libc_init_array+0x38>)
+ 80006b8:	4c0d      	ldr	r4, [pc, #52]	; (80006f0 <__libc_init_array+0x3c>)
+ 80006ba:	1b64      	subs	r4, r4, r5
+ 80006bc:	10a4      	asrs	r4, r4, #2
+ 80006be:	2600      	movs	r6, #0
+ 80006c0:	42a6      	cmp	r6, r4
+ 80006c2:	d109      	bne.n	80006d8 <__libc_init_array+0x24>
+ 80006c4:	4d0b      	ldr	r5, [pc, #44]	; (80006f4 <__libc_init_array+0x40>)
+ 80006c6:	4c0c      	ldr	r4, [pc, #48]	; (80006f8 <__libc_init_array+0x44>)
+ 80006c8:	f000 f818 	bl	80006fc <_init>
+ 80006cc:	1b64      	subs	r4, r4, r5
+ 80006ce:	10a4      	asrs	r4, r4, #2
+ 80006d0:	2600      	movs	r6, #0
+ 80006d2:	42a6      	cmp	r6, r4
+ 80006d4:	d105      	bne.n	80006e2 <__libc_init_array+0x2e>
+ 80006d6:	bd70      	pop	{r4, r5, r6, pc}
+ 80006d8:	f855 3b04 	ldr.w	r3, [r5], #4
+ 80006dc:	4798      	blx	r3
+ 80006de:	3601      	adds	r6, #1
+ 80006e0:	e7ee      	b.n	80006c0 <__libc_init_array+0xc>
+ 80006e2:	f855 3b04 	ldr.w	r3, [r5], #4
+ 80006e6:	4798      	blx	r3
+ 80006e8:	3601      	adds	r6, #1
+ 80006ea:	e7f2      	b.n	80006d2 <__libc_init_array+0x1e>
+ 80006ec:	08000714 	.word	0x08000714
+ 80006f0:	08000714 	.word	0x08000714
+ 80006f4:	08000714 	.word	0x08000714
+ 80006f8:	08000718 	.word	0x08000718
+
+080006fc <_init>:
+ 80006fc:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 80006fe:	bf00      	nop
+ 8000700:	bcf8      	pop	{r3, r4, r5, r6, r7}
+ 8000702:	bc08      	pop	{r3}
+ 8000704:	469e      	mov	lr, r3
+ 8000706:	4770      	bx	lr
+
+08000708 <_fini>:
+ 8000708:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 800070a:	bf00      	nop
+ 800070c:	bcf8      	pop	{r3, r4, r5, r6, r7}
+ 800070e:	bc08      	pop	{r3}
+ 8000710:	469e      	mov	lr, r3
+ 8000712:	4770      	bx	lr
